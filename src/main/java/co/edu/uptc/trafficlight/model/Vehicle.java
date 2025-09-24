@@ -1,8 +1,8 @@
-// Vehicle.java - VERSIÓN MEJORADA
 package co.edu.uptc.trafficlight.model;
 
 import co.edu.uptc.trafficlight.business.TrafficController;
 import javafx.application.Platform;
+
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class Vehicle implements Runnable {
@@ -12,182 +12,191 @@ public class Vehicle implements Runnable {
     private VehicleState state;
     private final TrafficController controller;
 
-    // Posición para animación
+    // Posición y destino
     private double x, y;
     private double targetX, targetY;
     private boolean isAnimating = false;
     private String vehicleType;
+    private MovementType movementType;
 
-    public enum VehicleState {
-        WAITING, APPROACHING, CROSSING, CROSSED
-    }
+    // Velocidad individual (ms entre pasos)
+    private final int crossingSpeed;
+
+    public enum VehicleState { WAITING, APPROACHING, CROSSING, CROSSED }
+    public enum MovementType { STRAIGHT, LEFT, RIGHT }
 
     public Vehicle(String direction, TrafficController controller) {
         this.id = vehicleCounter.incrementAndGet();
         this.direction = direction;
         this.state = VehicleState.WAITING;
         this.controller = controller;
-        this.vehicleType = getRandomVehicleType();
+        this.vehicleType = randomVehicleType();
+
+        // Probabilidad: STRAIGHT 60%, LEFT 20%, RIGHT 20%
+        double r = Math.random();
+        if (r < 0.6) movementType = MovementType.STRAIGHT;
+        else if (r < 0.8) movementType = MovementType.LEFT;
+        else movementType = MovementType.RIGHT;
+
+        // Velocidad distinta por carro (50–90 ms por paso)
+        this.crossingSpeed = 50 + (int)(Math.random() * 40);
+
         initializePosition();
     }
 
     private void initializePosition() {
-        // Posiciones iniciales basadas en dirección
+        // Carril derecho de cada vía
         switch (direction) {
-            case "NORTH":
-                this.x = 400; // Centro horizontal
-                this.y = 50;  // Arriba
-                this.targetX = 400;
-                this.targetY = 600; // Abajo
-                break;
-            case "SOUTH":
-                this.x = 400;
-                this.y = 600;
-                this.targetX = 400;
-                this.targetY = 50;
-                break;
-            case "EAST":
-                this.x = 50;
-                this.y = 350;
-                this.targetX = 600;
-                this.targetY = 350;
-                break;
-            case "WEST":
-                this.x = 600;
-                this.y = 350;
-                this.targetX = 50;
-                this.targetY = 350;
-                break;
+            case "NORTH": this.x = 390; this.y = 50; break;   // hacia abajo por derecha
+            case "SOUTH": this.x = 410; this.y = 600; break;  // hacia arriba por derecha
+            case "EAST":  this.x = 50;  this.y = 360; break;  // hacia derecha por abajo
+            case "WEST":  this.x = 600; this.y = 340; break;  // hacia izquierda por arriba
         }
+        this.targetX = x;
+        this.targetY = y;
     }
 
-    private String getRandomVehicleType() {
-        String[] types = {"🚗", "🚙", "🚕", "🚐", "🚌"};
+    private String randomVehicleType() {
+        String[] types = {"🚗","🚙","🚕","🚐","🚌"};
         return types[(int)(Math.random() * types.length)];
     }
 
     @Override
     public void run() {
         try {
-            // 1. Vehículo esperando
             setState(VehicleState.WAITING);
-            Thread.sleep(500 + (int)(Math.random() * 1000)); // Tiempo aleatorio de espera
+            Thread.sleep(400 + (int)(Math.random() * 800));
 
-            // 2. Solicitar permiso para cruzar (SEMÁFORO CRÍTICO)
+            // solicitar permiso
             controller.requestCrossing(this);
 
-            // 3. Aproximarse a la intersección
+            if (!controller.isRunning()) {
+                controller.removeVehicle(this);
+                return;
+            }
+
+            // retraso humano
+            Thread.sleep(300 + (int)(Math.random() * 500));
+
+            // Aproximación
             setState(VehicleState.APPROACHING);
             animateToIntersection();
 
-            // 4. Cruzar la intersección (SECCIÓN CRÍTICA)
+            // Cruce
             setState(VehicleState.CROSSING);
             animateCrossing();
 
-            // 5. Completar cruce
+            // Terminar cruce
             controller.finishCrossing(this);
             setState(VehicleState.CROSSED);
 
-            // 6. Salir del área visible
+            // Salida
             animateExit();
 
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
+            controller.removeVehicle(this);
         }
     }
 
     private void animateToIntersection() throws InterruptedException {
         isAnimating = true;
         double startX = x, startY = y;
-        double endX, endY;
+        double entryX = x, entryY = y;
 
-        // Calcular punto de entrada a la intersección
+        // punto de entrada al carril dentro de la intersección
         switch (direction) {
-            case "NORTH":
-                endX = 400; endY = 300;
-                break;
-            case "SOUTH":
-                endX = 400; endY = 400;
-                break;
-            case "EAST":
-                endX = 300; endY = 350;
-                break;
-            case "WEST":
-            default:
-                endX = 500; endY = 350;
-                break;
+            case "NORTH": entryX = 390; entryY = 320; break;
+            case "SOUTH": entryX = 410; entryY = 380; break;
+            case "EAST":  entryX = 420; entryY = 360; break;
+            case "WEST":  entryX = 380; entryY = 340; break;
         }
 
-        // Animación suave en 1 segundo
         for (int i = 0; i <= 20; i++) {
-            double progress = i / 20.0;
-            x = startX + (endX - startX) * progress;
-            y = startY + (endY - startY) * progress;
-
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            double t = i / 20.0;
+            x = startX + (entryX - startX) * t;
+            y = startY + (entryY - startY) * t;
             Platform.runLater(() -> controller.notifyVehicleUpdate());
-            Thread.sleep(50);
+            Thread.sleep(40);
         }
         isAnimating = false;
     }
 
     private void animateCrossing() throws InterruptedException {
         isAnimating = true;
-        double startX = x, startY = y;
-        double endX, endY;
+        double sx = x, sy = y;
+        double ex = sx, ey = sy;
+        double cx = 400, cy = 350; // control de curva
 
-        // Calcular punto de salida de la intersección
         switch (direction) {
             case "NORTH":
-                endX = 400; endY = 400;
+                if (movementType == MovementType.STRAIGHT) { ex = 390; ey = 600; }
+                else if (movementType == MovementType.LEFT) { ex = 600; ey = 360; cx = 480; cy = 360; }
+                else { ex = 50; ey = 340; cx = 320; cy = 340; }
                 break;
             case "SOUTH":
-                endX = 400; endY = 300;
+                if (movementType == MovementType.STRAIGHT) { ex = 410; ey = 50; }
+                else if (movementType == MovementType.LEFT) { ex = 50; ey = 340; cx = 320; cy = 340; }
+                else { ex = 600; ey = 360; cx = 480; cy = 360; }
                 break;
             case "EAST":
-                endX = 500; endY = 350;
+                if (movementType == MovementType.STRAIGHT) { ex = 600; ey = 360; }
+                else if (movementType == MovementType.LEFT) { ex = 410; ey = 50; cx = 410; cy = 120; }
+                else { ex = 390; ey = 600; cx = 390; cy = 480; }
                 break;
             case "WEST":
-            default:
-                endX = 300; endY = 350;
+                if (movementType == MovementType.STRAIGHT) { ex = 50; ey = 340; }
+                else if (movementType == MovementType.LEFT) { ex = 390; ey = 600; cx = 390; cy = 480; }
+                else { ex = 410; ey = 50; cx = 410; cy = 120; }
                 break;
         }
 
-        // Cruce más lento para mostrar la sincronización
-        for (int i = 0; i <= 30; i++) {
-            double progress = i / 30.0;
-            x = startX + (endX - startX) * progress;
-            y = startY + (endY - startY) * progress;
-
+        int steps = 40;
+        for (int i = 0; i <= steps; i++) {
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            double t = i / (double) steps;
+            if (movementType == MovementType.STRAIGHT) {
+                x = sx + (ex - sx) * t;
+                y = sy + (ey - sy) * t;
+            } else {
+                double oneMinusT = 1 - t;
+                x = oneMinusT * oneMinusT * sx + 2 * oneMinusT * t * cx + t * t * ex;
+                y = oneMinusT * oneMinusT * sy + 2 * oneMinusT * t * cy + t * t * ey;
+            }
             Platform.runLater(() -> controller.notifyVehicleUpdate());
-            Thread.sleep(100); // Más lento para mostrar el cruce
+            Thread.sleep(crossingSpeed);
         }
+
+        this.targetX = ex;
+        this.targetY = ey;
         isAnimating = false;
     }
 
     private void animateExit() throws InterruptedException {
         isAnimating = true;
+        double startX = x, startY = y;
+        double endX = targetX, endY = targetY;
+
         for (int i = 0; i <= 20; i++) {
-            double progress = i / 20.0;
-            double startX = x, startY = y;
-
-            x = startX + (targetX - startX) * progress;
-            y = startY + (targetY - startY) * progress;
-
+            if (Thread.currentThread().isInterrupted()) throw new InterruptedException();
+            double t = i / 20.0;
+            x = startX + (endX - startX) * t;
+            y = startY + (endY - startY) * t;
             Platform.runLater(() -> controller.notifyVehicleUpdate());
             Thread.sleep(30);
         }
 
-        // Remover vehículo después de la animación
         Platform.runLater(() -> controller.removeVehicle(this));
+        isAnimating = false;
     }
 
-    // Getters adicionales para animación
+    // Getters
     public double getX() { return x; }
     public double getY() { return y; }
     public boolean isAnimating() { return isAnimating; }
     public String getVehicleType() { return vehicleType; }
-
-    // Getters existentes
+    public MovementType getMovementType() { return movementType; }
     public int getId() { return id; }
     public String getDirection() { return direction; }
     public VehicleState getState() { return state; }

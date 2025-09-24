@@ -1,4 +1,3 @@
-// TrafficLightApp.java - Aplicación principal
 package co.edu.uptc.trafficlight;
 
 import co.edu.uptc.trafficlight.view.TrafficLightSimulationView;
