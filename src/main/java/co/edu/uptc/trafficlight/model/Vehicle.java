@@ -12,14 +12,12 @@ public class Vehicle implements Runnable {
     private VehicleState state;
     private final TrafficController controller;
 
-    // Posición y destino
     private double x, y;
     private double targetX, targetY;
     private boolean isAnimating = false;
     private String vehicleType;
     private MovementType movementType;
 
-    // Velocidad individual (ms entre pasos)
     private final int crossingSpeed;
 
     public enum VehicleState { WAITING, APPROACHING, CROSSING, CROSSED }
@@ -32,25 +30,22 @@ public class Vehicle implements Runnable {
         this.controller = controller;
         this.vehicleType = randomVehicleType();
 
-        // Probabilidad: STRAIGHT 60%, LEFT 20%, RIGHT 20%
         double r = Math.random();
         if (r < 0.6) movementType = MovementType.STRAIGHT;
         else if (r < 0.8) movementType = MovementType.LEFT;
         else movementType = MovementType.RIGHT;
 
-        // Velocidad distinta por carro (50–90 ms por paso)
         this.crossingSpeed = 50 + (int)(Math.random() * 40);
 
         initializePosition();
     }
 
     private void initializePosition() {
-        // Carril derecho de cada vía
         switch (direction) {
-            case "NORTH": this.x = 390; this.y = 50; break;   // hacia abajo por derecha
-            case "SOUTH": this.x = 410; this.y = 600; break;  // hacia arriba por derecha
-            case "EAST":  this.x = 50;  this.y = 360; break;  // hacia derecha por abajo
-            case "WEST":  this.x = 600; this.y = 340; break;  // hacia izquierda por arriba
+            case "NORTH": this.x = 390; this.y = 50; break;
+            case "SOUTH": this.x = 410; this.y = 600; break;
+            case "EAST":  this.x = 50;  this.y = 360; break;
+            case "WEST":  this.x = 600; this.y = 340; break;
         }
         this.targetX = x;
         this.targetY = y;
@@ -67,7 +62,6 @@ public class Vehicle implements Runnable {
             setState(VehicleState.WAITING);
             Thread.sleep(400 + (int)(Math.random() * 800));
 
-            // solicitar permiso
             controller.requestCrossing(this);
 
             if (!controller.isRunning()) {
@@ -75,22 +69,17 @@ public class Vehicle implements Runnable {
                 return;
             }
 
-            // retraso humano
             Thread.sleep(300 + (int)(Math.random() * 500));
 
-            // Aproximación
             setState(VehicleState.APPROACHING);
             animateToIntersection();
 
-            // Cruce
             setState(VehicleState.CROSSING);
             animateCrossing();
 
-            // Terminar cruce
             controller.finishCrossing(this);
             setState(VehicleState.CROSSED);
 
-            // Salida
             animateExit();
 
         } catch (InterruptedException e) {
@@ -104,7 +93,6 @@ public class Vehicle implements Runnable {
         double startX = x, startY = y;
         double entryX = x, entryY = y;
 
-        // punto de entrada al carril dentro de la intersección
         switch (direction) {
             case "NORTH": entryX = 390; entryY = 320; break;
             case "SOUTH": entryX = 410; entryY = 380; break;
@@ -127,7 +115,7 @@ public class Vehicle implements Runnable {
         isAnimating = true;
         double sx = x, sy = y;
         double ex = sx, ey = sy;
-        double cx = 400, cy = 350; // control de curva
+        double cx = 400, cy = 350;
 
         switch (direction) {
             case "NORTH":
@@ -191,7 +179,6 @@ public class Vehicle implements Runnable {
         isAnimating = false;
     }
 
-    // Getters
     public double getX() { return x; }
     public double getY() { return y; }
     public boolean isAnimating() { return isAnimating; }

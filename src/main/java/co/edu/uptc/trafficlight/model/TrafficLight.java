@@ -11,7 +11,6 @@ public class TrafficLight {
         this.stateStartTime = System.currentTimeMillis();
     }
 
-    // Getters y setters
     public TrafficLightState getCurrentState() { return currentState; }
     public void setCurrentState(TrafficLightState state) {
         this.currentState = state;

@@ -58,7 +58,7 @@ public class TrafficLightSimulationView implements Observer {
 
         Scene scene = new Scene(root, 1200, 800);
 
-        primaryStage.setTitle("🚦 Simulación de Semáforo - UPTC (Completo)");
+        primaryStage.setTitle("Simulación de Semáforo");
         primaryStage.setScene(scene);
         primaryStage.show();
     }
@@ -68,7 +68,6 @@ public class TrafficLightSimulationView implements Observer {
         intersectionPane.setPrefSize(800, 600);
         intersectionPane.setStyle("-fx-background-color: #2c3e50;");
 
-        // calles
         Rectangle verticalStreet = new Rectangle(350, 0, 100, 600);
         verticalStreet.setFill(Color.DARKGRAY);
         Rectangle horizontalStreet = new Rectangle(0, 300, 800, 100);
@@ -83,14 +82,12 @@ public class TrafficLightSimulationView implements Observer {
 
         intersectionPane.getChildren().addAll(verticalStreet, horizontalStreet, verticalLine, horizontalLine);
 
-        // intersección central
         Rectangle intersection = new Rectangle(350, 300, 100, 100);
         intersection.setFill(Color.LIGHTGRAY);
         intersection.setStroke(Color.YELLOW);
         intersection.setStrokeWidth(3);
         intersectionPane.getChildren().add(intersection);
 
-        // semáforos visuales
         createTrafficLightDisplay("NORTH", 375, 250);
         createTrafficLightDisplay("SOUTH", 375, 450);
         createTrafficLightDisplay("EAST", 500, 325);
@@ -245,7 +242,6 @@ public class TrafficLightSimulationView implements Observer {
         controller = new TrafficController();
         controller.addObserver(this);
 
-        // Limpiar sólo nodos dinámicos (los vehiculos usamos userData = Integer id)
         intersectionPane.getChildren().removeIf(node -> node.getUserData() instanceof Integer);
 
         logArea.clear();
@@ -282,7 +278,6 @@ public class TrafficLightSimulationView implements Observer {
     }
 
     private void updateVehicleDisplay() {
-        // eliminar nodos dinámicos previos (vehículos y etiquetas) -> userData = Integer (vehicleId)
         intersectionPane.getChildren().removeIf(node -> node.getUserData() instanceof Integer);
 
         List<Vehicle> vehicles = controller.getActiveVehicles();
@@ -291,7 +286,7 @@ public class TrafficLightSimulationView implements Observer {
 
             Text vehicleIcon = new Text(v.getX(), v.getY(), v.getVehicleType());
             vehicleIcon.setFont(Font.font(20));
-            vehicleIcon.setUserData(v.getId()); // marcar como dinámico
+            vehicleIcon.setUserData(v.getId());
 
             switch (v.getState()) {
                 case APPROACHING: vehicleIcon.setFill(Color.YELLOW); break;
@@ -301,12 +296,11 @@ public class TrafficLightSimulationView implements Observer {
 
             intersectionPane.getChildren().add(vehicleIcon);
 
-            // letra de movimiento (S/L/R) sobre el vehículo
             String m = v.getMovementType().toString().substring(0,1);
             Text movementLabel = new Text(v.getX(), v.getY() - 12, m);
             movementLabel.setFont(Font.font(10));
             movementLabel.setFill(Color.WHITE);
-            movementLabel.setUserData(v.getId()); // también dinámico
+            movementLabel.setUserData(v.getId());
             intersectionPane.getChildren().add(movementLabel);
         }
     }

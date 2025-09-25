@@ -19,20 +19,17 @@ public class TrafficController extends Observable {
      */
     private final Map<String, Map<Vehicle.MovementType, Semaphore>> laneSemaphores;
 
-    private final Semaphore intersectionSemaphore; // control de sección crítica
+    private final Semaphore intersectionSemaphore;
     private final List<Vehicle> activeVehicles;
-    private final List<Vehicle> crossingVehicles; // Vehículos en intersección
+    private final List<Vehicle> crossingVehicles;
     private boolean running;
 
-    // Hilos principales
     private Thread lightCycleThread;
     private Thread vehicleGeneratorThread;
     private Thread safetyMonitorThread;
 
-    // Hilos de vehículos para control/interrupción
     private final Map<Integer, Thread> vehicleThreads = new ConcurrentHashMap<>();
 
-    // Estadísticas
     private final AtomicInteger totalVehiclesGenerated = new AtomicInteger(0);
     private final AtomicInteger vehiclesCrossedSafely = new AtomicInteger(0);
     private final AtomicInteger accidentsPrevented = new AtomicInteger(0);
@@ -41,7 +38,6 @@ public class TrafficController extends Observable {
     private static final String[] DIRECTIONS = {"NORTH", "SOUTH", "EAST", "WEST"};
     private static final int MAX_VEHICLES_IN_INTERSECTION = 2;
 
-    // Permisos por tipo de movimiento en verde
     private static final int GREEN_STRAIGHT_PERMITS = 3;
     private static final int GREEN_LEFT_PERMITS = 1;
     private static final int GREEN_RIGHT_PERMITS = 1;
@@ -97,15 +93,12 @@ public class TrafficController extends Observable {
             try {
                 String phase = phases[currentPhase];
 
-                // Verde
                 setPhaseGreen(phase);
                 Thread.sleep(5000);
 
-                // Amarillo
                 setPhaseYellow(phase);
                 Thread.sleep(2000);
 
-                // Rojo
                 setPhaseRed(phase);
                 Thread.sleep(1000);
 
@@ -141,7 +134,6 @@ public class TrafficController extends Observable {
             setLightState("EAST", TrafficLightState.YELLOW);
             setLightState("WEST", TrafficLightState.YELLOW);
         }
-        // No asignamos permisos en amarillo
         notifyUpdate();
     }
 
@@ -162,7 +154,6 @@ public class TrafficController extends Observable {
         Map<Vehicle.MovementType, Semaphore> movementMap = laneSemaphores.get(direction);
         if (movementMap == null) return;
 
-        // Drenar antes
         for (Semaphore s : movementMap.values()) {
             s.drainPermits();
         }
@@ -172,7 +163,6 @@ public class TrafficController extends Observable {
             movementMap.get(Vehicle.MovementType.LEFT).release(GREEN_LEFT_PERMITS);
             movementMap.get(Vehicle.MovementType.RIGHT).release(GREEN_RIGHT_PERMITS);
         }
-        // si es YELLOW/RED no damos permisos
     }
 
     private void setLightState(String direction, TrafficLightState state) {
@@ -206,10 +196,6 @@ public class TrafficController extends Observable {
         }
     }
 
-    /**
-     * Adquiere semáforo por movimiento (blocking). Usa intersectionSemaphore para
-     * garantizar límite de vehículos en intersección.
-     */
     public void requestCrossing(Vehicle vehicle) throws InterruptedException {
         System.out.println("🚦 Vehículo " + vehicle.getId() + " desde " + vehicle.getDirection()
                 + " solicita cruzar (" + vehicle.getMovementType() + ")");
@@ -218,10 +204,8 @@ public class TrafficController extends Observable {
         if (movementMap == null) throw new IllegalStateException("Dirección no existe");
 
         Semaphore movementSemaphore = movementMap.get(vehicle.getMovementType());
-        // Esperar permiso del movimiento (p.ej. verde)
         movementSemaphore.acquire();
 
-        // Esperar disponibilidad en la intersección
         int waiting = 0;
         while (!intersectionSemaphore.tryAcquire(100, TimeUnit.MILLISECONDS)) {
             waiting += 100;
@@ -231,7 +215,6 @@ public class TrafficController extends Observable {
                         " esperó " + waiting + "ms por intersección ocupada");
             }
             if (!running) {
-                // simulación detenida mientras esperaba
                 return;
             }
         }
@@ -242,7 +225,7 @@ public class TrafficController extends Observable {
             maxConcurrentInIntersection.updateAndGet(max -> Math.max(max, cur));
         }
 
-        System.out.println("✅ Vehículo " + vehicle.getId() + " ENTRA a intersección.");
+        System.out.println("Vehículo " + vehicle.getId() + " ENTRA a intersección.");
     }
 
     public void finishCrossing(Vehicle vehicle) {
@@ -254,10 +237,9 @@ public class TrafficController extends Observable {
 
         vehiclesCrossedSafely.incrementAndGet();
 
-        // Limpiar hilo del mapa si ya terminó
         vehicleThreads.remove(vehicle.getId());
 
-        System.out.println("🏁 Vehículo " + vehicle.getId() + " SALIÓ de intersección.");
+        System.out.println("Vehículo " + vehicle.getId() + " SALIÓ de intersección.");
         notifyUpdate();
     }
 
@@ -300,7 +282,6 @@ public class TrafficController extends Observable {
         if (vehicleGeneratorThread != null) vehicleGeneratorThread.interrupt();
         if (safetyMonitorThread != null) safetyMonitorThread.interrupt();
 
-        // Interrumpir hilos de vehículos
         for (Thread t : vehicleThreads.values()) {
             if (t != null && t.isAlive()) {
                 t.interrupt();
@@ -311,7 +292,6 @@ public class TrafficController extends Observable {
         synchronized (activeVehicles) { activeVehicles.clear(); }
         synchronized (crossingVehicles) { crossingVehicles.clear(); }
 
-        // Drenar semáforos
         for (Map<Vehicle.MovementType, Semaphore> map : laneSemaphores.values()) {
             for (Semaphore s : map.values()) s.drainPermits();
         }
@@ -319,7 +299,6 @@ public class TrafficController extends Observable {
         notifyUpdate();
     }
 
-    // Getters estadísticos
     public int getTotalVehiclesGenerated() { return totalVehiclesGenerated.get(); }
     public int getVehiclesCrossedSafely() { return vehiclesCrossedSafely.get(); }
     public int getAccidentsPrevented() { return accidentsPrevented.get(); }
